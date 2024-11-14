@@ -18,7 +18,6 @@ services:
       - ftp_proxy=$ftp_proxy
       - no_proxy=$no_proxy
     volumes:
-      - /proc:/proc:rw
       - /dev/shm:/dev/shm:rw
       - ../../../:/home/build/work:rw
     devices:
@@ -27,5 +26,5 @@ services:
     cap_add:
       - NET_ADMIN
     user: build
-    command: /bin/bash
+    command: /bin/sh -c "sudo mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc && /bin/bash"
 
