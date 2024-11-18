@@ -25,6 +25,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'lib/python/cve'))
 import nvd_cve
 import debian_cve
 import kernel_cve
+import kev_cve
 import bitbake_runner
 import json
 
@@ -131,6 +132,7 @@ def fill_cve_info(cves, cve_products, db_file):
                 cves[pkgname][cveid]["CVSS v3 BASE SCORE"] = data[3]
                 cves[pkgname][cveid]["VECTOR"] = data[4]
                 cves[pkgname][cveid]["VECTOR STRING"] = data[5]
+                cves[pkgname][cveid]["KEV"] = "Not Found"
                 cves[pkgname][cveid]["MORE INFORMATION"] = f"https://nvd.nist.gov/vuln/detail/{cveid}"
             else:
                 cves[pkgname][cveid]["PACKAGE NAME"] = cves[pkgname][cveid]["PACKAGE NAME"]
@@ -141,6 +143,7 @@ def fill_cve_info(cves, cve_products, db_file):
                 cves[pkgname][cveid]["CVSS v3 BASE SCORE"] = "0.0"
                 cves[pkgname][cveid]["VECTOR"] = "UNKNOWN"
                 cves[pkgname][cveid]["VECTOR STRING"] = "UNKNOWN"
+                cves[pkgname][cveid]["KEV"] = "Not Found"
                 cves[pkgname][cveid]["MORE INFORMATION"] = f"https://security-tracker.debian.org/tracker/{cveid}"
 
 
@@ -438,6 +441,7 @@ def recheck_kernel_cve(db_file, kernel_pkg_name, kernel_src_name, version, cveid
         cve["VECTOR"] = data[4]
         cve["VECTOR STRING"] = data[5]
 
+    cve["KEV"] = "None"
     cve["MORE INFORMATION"] = f"https://nvd.nist.gov/vuln/detail/{cveid}"
 
     return cve
@@ -475,7 +479,33 @@ def check_kernel_cves_by_cip_kernel_sec(uniq_installed_pkgs, cves, kernel_src_di
 
     return cves
 
-def create_cves_info(db_file, debian_cve_list, uniq_installed_pkgs, installed_pkgs, codename, cve_products, kernel_src_dir, cip_kernel_sec_dir):
+def create_kev_data(kev_list):
+    kev_json = read_json(kev_list)
+
+    kev_data = {}
+    for kev in kev_json["vulnerabilities"]:
+        cve_id = kev["cveID"]
+        kev_data[cve_id] = kev
+
+    return kev_data
+
+def add_kev_info(cves, kev_list):
+    kev_data = create_kev_data(kev_list)
+
+    kev_cve_ids = kev_data.keys()
+
+    for pkg in cves:
+        pkg_cve_ids = cves[pkg].keys()
+        common_cves = list(set(pkg_cve_ids) & set(kev_cve_ids))
+        if len(common_cves) > 0:
+            for cveid in common_cves:
+                pkg_info = cves[pkg]
+                pkg_info[cveid]["KEV"] = "Found"
+                pkg_info[cveid]["KNOWN RANSOMWARE CAMPAIGN USE"] = kev_data[cveid]["knownRansomwareCampaignUse"]
+
+    return cves
+
+def create_cves_info(db_file, debian_cve_list, uniq_installed_pkgs, installed_pkgs, codename, cve_products, kernel_src_dir, cip_kernel_sec_dir, kev_list):
     logger.info("Checking CVEs ...")
 
     installed_pkgs_cves_by_debian_data, cve_not_in_debian = find_debian_pkg_cves(debian_cve_list, uniq_installed_pkgs)
@@ -486,6 +516,8 @@ def create_cves_info(db_file, debian_cve_list, uniq_installed_pkgs, installed_pk
     cves = fill_cve_info(cves, cve_products, db_file)
 
     cves = check_kernel_cves_by_cip_kernel_sec(uniq_installed_pkgs, cves, kernel_src_dir, cip_kernel_sec_dir, db_file)
+
+    cves = add_kev_info(cves, kev_list)
     return cves
 
 def write_text(cves, output_dir, uniq_installed_pkgs):
@@ -511,6 +543,9 @@ def write_text(cves, output_dir, uniq_installed_pkgs):
                 f.write(f"CVSS v3 BASE SCORE: {info['CVSS v3 BASE SCORE']}\n")
                 f.write(f"VECTOR: {info['VECTOR']}\n")
                 f.write(f"VECTOR STRING: {info['VECTOR STRING']}\n")
+                f.write(f"KEV: {info['KEV']}\n")
+                if info["KEV"] == "Found":
+                    f.write(f"KNOWN RANSOMWARE CAMPAIGN USE: {info['KNOWN RANSOMWARE CAMPAIGN USE']}\n")
                 f.write(f"MORE INFORMATION: {info['MORE INFORMATION']}\n")
                 f.write("\n")
 
@@ -619,6 +654,11 @@ def main(args):
         logger.critical("Failed to fetch CVE data from Debian")
         exit(1)
 
+    kev_list = kev_cve.fetch_kev_data(cve_data_dl_dir)
+    if kev_list is None:
+        logger.critical("Failed to fetch KEV data from CISA")
+        exit(1)
+
     cip_kernel_sec_dir = kernel_cve.fetch_cip_kernel_sec(cve_data_dl_dir)
     if cip_kernel_sec_dir is None:
         logger.critical("Failed to fetch kernel-cip-sec")
@@ -630,7 +670,7 @@ def main(args):
 
     uniq_installed_pkgs = create_unique_package(installed_pkgs)
     linux_kernel_src_dir = os.path.abspath(bitbakeinfo["kernel_srcdir"])
-    cves = create_cves_info(db_file, debian_cve_list, uniq_installed_pkgs, installed_pkgs, args.debian_codename, cve_products, linux_kernel_src_dir, cip_kernel_sec_dir)
+    cves = create_cves_info(db_file, debian_cve_list, uniq_installed_pkgs, installed_pkgs, args.debian_codename, cve_products, linux_kernel_src_dir, cip_kernel_sec_dir, kev_list)
 
     cves = update_ignored_cves_status(cves, cve_ignore_list)
 
