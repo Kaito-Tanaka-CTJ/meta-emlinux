@@ -121,9 +121,6 @@ def fill_cve_info(cves, cve_products, db_file):
 
             # CVE id such as TEMP-0290435-0B57B5 not in NVD database.
             if data:
-                cves[pkgname][cveid]["PACKAGE NAME"] = cves[pkgname][cveid]["PACKAGE NAME"]
-                cves[pkgname][cveid]["BINARY PACKAGE NAME"] = cves[pkgname][cveid]["BINARY PACKAGE NAME"]
-                cves[pkgname][cveid]["VERSION"] = cves[pkgname][cveid]["VERSION"]
                 if data[0] == "Rejected":
                     cves[pkgname][cveid]["CVE STATUS"] = "Rejected"
 
@@ -135,9 +132,6 @@ def fill_cve_info(cves, cve_products, db_file):
                 cves[pkgname][cveid]["KEV"] = "Not Found"
                 cves[pkgname][cveid]["MORE INFORMATION"] = f"https://nvd.nist.gov/vuln/detail/{cveid}"
             else:
-                cves[pkgname][cveid]["PACKAGE NAME"] = cves[pkgname][cveid]["PACKAGE NAME"]
-                cves[pkgname][cveid]["BINARY PACKAGE NAME"] = cves[pkgname][cveid]["BINARY PACKAGE NAME"]
-                cves[pkgname][cveid]["VERSION"] = cves[pkgname][cveid]["VERSION"]
                 cves[pkgname][cveid]["CVE SUMMARY"] = ""
                 cves[pkgname][cveid]["CVSS v2 BASE SCORE"] = "0.0"
                 cves[pkgname][cveid]["CVSS v3 BASE SCORE"] = "0.0"
