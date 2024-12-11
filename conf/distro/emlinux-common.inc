@@ -36,3 +36,7 @@ WKS_FILE ?= "${MACHINE}.wks"
 SDK_PREINSTALL += "bc"
 
 SDK_INSTALL += "linux-headers-${KERNEL_NAME}"
+
+# Use debootstrap as default rootfs bootstrap provider
+PREFERRED_PROVIDER_bootstrap-host ?= "isar-bootstrap-host"
+PREFERRED_PROVIDER_bootstrap-target ?= "isar-bootstrap-target"
